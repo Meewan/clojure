@@ -1,45 +1,57 @@
-;; Anything you type in here will be executed
-;; immediately with the results shown on the
-;; right.
-
+;;TODO ajouter un typage fort
+;;//en coursTODO ajouter la logique avec la syntaxe type C (et donc les boolean)
+;;TODO ajouter les operations ternaires type C
 
 (ns example.core
   (:require [instaparse.core :as insta]))
 
+
+;definition de la grammaire
 (def parser
   (insta/parser
-   "expr = number | operation | assignement
+   "expr = number | operation | assignement | test
     assignement =  varName space ':=' space elt
-    operation = <'('>? (elt) space operator space (elt) <')'>?
-    <elt> = number | operation
-    operator = '=' / ('*' | '/' |'%') / ('+' | '-')
+    operation = <'('>? (elt|varGet) space arithmeticOperator space (elt|varGet) <')'>?
+    test = <'('>? (elt|varGet) space booleanOperator space (elt|varGet) <')'>?
+    varGet = varName
+    <elt> = number | operation |test
+    arithmeticOperator =  ('*' | '/' |'%') / ('+' | '-')
+    booleanOperator = ('==' | '!=' | '>' | '<' | '>=' | '<=') / ('!')
     <space> = <#'[ ]+'>
     letter = #'[a-zA-Z]'
     varName = #'[a-zA-Z]+'
     number = #'[0-9]+(.[0-9]+)?'"))
 
-(parser "a := 12 * 3")
+(parser "c := a == b")
 
 ;choix de l'opérateur
 (defn choose-operator [op]
   (case op
-    "+" +
-    "-" -
-    "*" *
-    "/" /
-    "%" mod
+    "+"  +
+    "-"  -
+    "*"  *
+    "/"  /
+    "%"  mod
+    "!"  not
+    "==" =
+    "!=" #(not (= %1 %2))
+    ">"  >
+    ">=" >=
+    "<"  <
+    "<=" <=
       ))
 
 ;assignement d'une valeur a une variable
 (defn assign [variable value env]
-  (merge  {variable value} env)
+  (assoc env  variable value)
   )
 
 ;logique de parsing
 (defn transform-options [env]
-  {:number read-string
-   :varName read-string
-   :operator choose-operator
+  {:number #(Long/parseLong %1)
+   :varName keyword
+   :arithmeticOperator choose-operator
+   :varGet  #(env %1)
    :operation #(%2 %1 %3)
    :assignement #(assign %1 %3 env)
    :expr identity})
@@ -55,12 +67,20 @@
   (let [env {}]
     (loop [expr (clojure.string/split  expression #"@" ) ;on coupe sur le retour a la ligne (il faut bien un caractere de démarcation)
            env env]
-      (if-not (empty? expr)  (recur (rest expr) (print (parse  (first expr) env) "\n")))
+      (if  (empty? expr) env (
+                              recur (rest expr)  (
+                                                  let [env (parse  (first expr) env)] (do (print env "\n") env)))
 
-    )))
+    ))))
 
-(parse "a := 3 + 2" {})
-(repl "a := 3 + 3@b := 5 + 7"); la sortie est dans la console, la méthode ne retourne rien
+;pour tester que ça marche
+(parse "3 + 2" {})
+(repl "a := 3 + 3@b := 6 - 8@c := a + b"); la sortie est dans la console, la méthode ne retourne rien
+
+
+
+
+
 
 
 
